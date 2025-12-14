@@ -32,6 +32,7 @@ require_relative "sbom/generator"
 require_relative "sbom/validation_result"
 require_relative "sbom/validator"
 require_relative "sbom/output"
+require_relative "sbom/enricher"
 
 module Sbom
   class << self
@@ -49,6 +50,15 @@ module Sbom
 
     def validate_file(filename, sbom_type: :auto)
       Validator.validate_file(filename, sbom_type: sbom_type)
+    end
+
+    def enrich(sbom)
+      Enricher.enrich(sbom)
+    end
+
+    def enrich_file(filename, sbom_type: :auto)
+      sbom = parse_file(filename, sbom_type: sbom_type)
+      Enricher.enrich(sbom)
     end
   end
 end

@@ -69,6 +69,22 @@ end
 Sbom::Validator.validate_file!("example.cdx.json")
 ```
 
+### Enriching SBOMs
+
+Enrich packages with metadata from [ecosyste.ms](https://ecosyste.ms):
+
+```ruby
+# Enrich an entire SBOM
+sbom = Sbom.parse_file("example.cdx.json")
+enriched = Sbom.enrich(sbom)
+
+# Or parse and enrich in one step
+enriched = Sbom.enrich_file("example.cdx.json")
+
+```
+
+Enrichment adds: description, homepage, download location, license, repository URL, registry URL, documentation URL, supplier info, and security advisories.
+
 ### Building Packages
 
 The Package class provides an object interface for building package data:
@@ -118,6 +134,11 @@ sbom document outline example.cdx.json
 sbom document info example.spdx.json
 sbom document query example.cdx.json --package rails
 sbom document query example.cdx.json --license MIT
+
+# Enrich SBOM with ecosyste.ms data
+sbom enrich example.cdx.json
+sbom enrich example.cdx.json --output enriched.json
+cat example.cdx.json | sbom enrich -
 ```
 
 ## Supported Formats

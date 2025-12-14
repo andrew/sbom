@@ -25,6 +25,8 @@ module Sbom
         validate_command
       when "convert"
         convert_command
+      when "enrich"
+        enrich_command
       when "document"
         document_command
       when "version", "-v", "--version"
@@ -156,6 +158,51 @@ module Sbom
       end
     rescue Sbom::ParserError, Sbom::GeneratorError => e
       abort "Conversion error: #{e.message}"
+    end
+
+    def enrich_command
+      parser = OptionParser.new do |opts|
+        opts.banner = "Usage: sbom enrich <file> [options]"
+        opts.on("-t", "--type TYPE", "SBOM type (spdx, cyclonedx, auto)") { |v| @options[:type] = v.to_sym }
+        opts.on("-f", "--format FORMAT", "Output format (json, yaml)") { |v| @options[:format] = v }
+        opts.on("-o", "--output FILE", "Output file") { |v| @options[:output] = v }
+        opts.on("--advisories", "Include security advisories") { @options[:advisories] = true }
+        opts.on("-h", "--help", "Show help") { puts opts; exit }
+      end
+      parser.parse!(@args)
+
+      file = @args.shift
+      abort "Error: No file specified. Use '-' for stdin." unless file
+
+      sbom = if file == "-"
+               content = $stdin.read
+               Sbom::Parser.parse_string(content, sbom_type: @options[:type] || :auto)
+             else
+               Sbom::Parser.parse_file(file, sbom_type: @options[:type] || :auto)
+             end
+
+      enricher = Sbom::Enricher.new(sbom)
+      enriched = enricher.enrich
+
+      format = @options[:format] || "json"
+      output = case format
+               when "yaml"
+                 enriched.to_h.to_yaml
+               else
+                 JSON.pretty_generate(enriched.to_h)
+               end
+
+      if @options[:output]
+        File.write(@options[:output], output)
+        warn "Enriched SBOM written to #{@options[:output]}"
+        warn "Enrichment errors: #{enricher.errors.count}" if enricher.errors.any?
+      else
+        puts output
+      end
+
+      enricher.errors.each { |e| warn "Warning: #{e[:purl]} - #{e[:error]}" } if enricher.errors.any?
+    rescue Sbom::ParserError => e
+      abort "Error: #{e.message}"
     end
 
     def document_command
@@ -329,6 +376,7 @@ module Sbom
           generate   Create a new SBOM
           validate   Validate SBOM against schema
           convert    Convert between SBOM formats
+          enrich     Enrich SBOM with data from ecosyste.ms
           document   Work with SBOM documents
           version    Show version
 
