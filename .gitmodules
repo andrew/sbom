@@ -1,0 +1,7 @@
+[submodule "spec/cyclonedx"]
+	path = spec/cyclonedx
+	url = https://github.com/CycloneDX/specification
+[submodule "spec/spdx"]
+	path = spec/spdx
+	url = https://github.com/spdx/spdx-spec
+	branch = support/2.3.1

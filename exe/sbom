@@ -1,0 +1,346 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "optparse"
+require "sbom"
+
+module Sbom
+  class CLI
+    def initialize(args)
+      @args = args
+      @options = {}
+    end
+
+    def run
+      return show_help if @args.empty?
+
+      command = @args.shift
+
+      case command
+      when "parse"
+        parse_command
+      when "generate"
+        generate_command
+      when "validate"
+        validate_command
+      when "convert"
+        convert_command
+      when "document"
+        document_command
+      when "version", "-v", "--version"
+        puts "sbom #{Sbom::VERSION}"
+      when "help", "-h", "--help"
+        show_help
+      else
+        warn "Unknown command: #{command}"
+        show_help
+        exit 1
+      end
+    end
+
+    private
+
+    def parse_command
+      parser = OptionParser.new do |opts|
+        opts.banner = "Usage: sbom parse <file> [options]"
+        opts.on("-t", "--type TYPE", "SBOM type (spdx, cyclonedx, auto)") { |v| @options[:type] = v.to_sym }
+        opts.on("-f", "--format FORMAT", "Output format (json, yaml, summary)") { |v| @options[:format] = v }
+        opts.on("-h", "--help", "Show help") { puts opts; exit }
+      end
+      parser.parse!(@args)
+
+      file = @args.shift
+      abort "Error: No file specified" unless file
+
+      sbom_type = @options[:type] || :auto
+      sbom = Sbom::Parser.parse_file(file, sbom_type: sbom_type)
+
+      format = @options[:format] || "summary"
+
+      case format
+      when "json"
+        puts JSON.pretty_generate(sbom.to_h)
+      when "yaml"
+        puts sbom.to_h.to_yaml
+      else
+        print_summary(sbom)
+      end
+    rescue Sbom::ParserError => e
+      abort "Parse error: #{e.message}"
+    end
+
+    def generate_command
+      parser = OptionParser.new do |opts|
+        opts.banner = "Usage: sbom generate [options]"
+        opts.on("-n", "--name NAME", "Project name") { |v| @options[:name] = v }
+        opts.on("-t", "--type TYPE", "SBOM type (spdx, cyclonedx)") { |v| @options[:type] = v.to_sym }
+        opts.on("-f", "--format FORMAT", "Output format (tag, json, yaml)") { |v| @options[:format] = v.to_sym }
+        opts.on("-o", "--output FILE", "Output file") { |v| @options[:output] = v }
+        opts.on("-h", "--help", "Show help") { puts opts; exit }
+      end
+      parser.parse!(@args)
+
+      name = @options[:name] || "SBOM"
+      sbom_type = @options[:type] || :spdx
+      format = @options[:format] || :json
+
+      generator = Sbom::Generator.new(sbom_type: sbom_type, format: format)
+
+      sbom_data = { packages: {} }
+      generator.generate(name, sbom_data)
+
+      output = generator.output
+
+      if @options[:output]
+        File.write(@options[:output], output)
+        puts "SBOM written to #{@options[:output]}"
+      else
+        puts output
+      end
+    end
+
+    def validate_command
+      parser = OptionParser.new do |opts|
+        opts.banner = "Usage: sbom validate <file> [options]"
+        opts.on("-t", "--type TYPE", "SBOM type (spdx, cyclonedx, auto)") { |v| @options[:type] = v.to_sym }
+        opts.on("-h", "--help", "Show help") { puts opts; exit }
+      end
+      parser.parse!(@args)
+
+      file = @args.shift
+      abort "Error: No file specified" unless file
+
+      sbom_type = @options[:type] || :auto
+      validator = Sbom::Validator.new(sbom_type: sbom_type)
+      result = validator.validate_file(file)
+
+      if result.valid?
+        puts "#{result.format.to_s.upcase}: Valid (version #{result.version})"
+      else
+        puts "#{result.format&.to_s&.upcase || 'SBOM'}: INVALID"
+        result.errors.each { |e| puts "  - #{e}" }
+        exit 1
+      end
+    rescue Sbom::ValidatorError => e
+      abort "Validation error: #{e.message}"
+    end
+
+    def convert_command
+      parser = OptionParser.new do |opts|
+        opts.banner = "Usage: sbom convert <file> [options]"
+        opts.on("-t", "--type TYPE", "Output SBOM type (spdx, cyclonedx)") { |v| @options[:type] = v.to_sym }
+        opts.on("-f", "--format FORMAT", "Output format (tag, json, yaml)") { |v| @options[:format] = v.to_sym }
+        opts.on("-o", "--output FILE", "Output file") { |v| @options[:output] = v }
+        opts.on("-h", "--help", "Show help") { puts opts; exit }
+      end
+      parser.parse!(@args)
+
+      file = @args.shift
+      abort "Error: No file specified" unless file
+
+      sbom = Sbom::Parser.parse_file(file)
+
+      output_type = @options[:type] || :spdx
+      output_format = @options[:format] || :json
+
+      generator = Sbom::Generator.new(sbom_type: output_type, format: output_format)
+      generator.generate(sbom.document&.dig(:name) || "Converted", sbom.to_h)
+
+      output = generator.output
+
+      if @options[:output]
+        File.write(@options[:output], output)
+        puts "Converted SBOM written to #{@options[:output]}"
+      else
+        puts output
+      end
+    rescue Sbom::ParserError, Sbom::GeneratorError => e
+      abort "Conversion error: #{e.message}"
+    end
+
+    def document_command
+      subcommand = @args.shift
+
+      case subcommand
+      when "outline"
+        document_outline_command
+      when "query"
+        document_query_command
+      when "info"
+        document_info_command
+      else
+        puts "Usage: sbom document <subcommand>"
+        puts ""
+        puts "Subcommands:"
+        puts "  outline    Show structure of an SBOM document"
+        puts "  query      Search for information in an SBOM"
+        puts "  info       Show document metadata"
+        exit 1
+      end
+    end
+
+    def document_outline_command
+      parser = OptionParser.new do |opts|
+        opts.banner = "Usage: sbom document outline <file>"
+        opts.on("-h", "--help", "Show help") { puts opts; exit }
+      end
+      parser.parse!(@args)
+
+      file = @args.shift
+      abort "Error: No file specified" unless file
+
+      sbom = Sbom::Parser.parse_file(file)
+
+      puts "SBOM Structure"
+      puts "=============="
+      puts ""
+      puts "Type: #{sbom.sbom_type}"
+      puts "Version: #{sbom.version}"
+      puts ""
+
+      if sbom.document
+        puts "Document:"
+        puts "  Name: #{sbom.document[:name]}"
+        puts "  ID: #{sbom.document[:id]}"
+        puts ""
+      end
+
+      puts "Packages (#{sbom.packages.count}):"
+      sbom.packages.each_with_index do |pkg, i|
+        puts "  #{i + 1}. #{pkg[:name]}#{pkg[:version] ? " @ #{pkg[:version]}" : ""}"
+      end
+      puts ""
+
+      if sbom.files.any?
+        puts "Files (#{sbom.files.count}):"
+        sbom.files.each_with_index do |file_data, i|
+          puts "  #{i + 1}. #{file_data[:name]}"
+        end
+        puts ""
+      end
+
+      puts "Relationships (#{sbom.relationships.count}):"
+      sbom.relationships.each do |rel|
+        puts "  #{rel[:source]} --[#{rel[:type]}]--> #{rel[:target]}"
+      end
+    rescue Sbom::ParserError => e
+      abort "Error: #{e.message}"
+    end
+
+    def document_query_command
+      parser = OptionParser.new do |opts|
+        opts.banner = "Usage: sbom document query <file> [options]"
+        opts.on("-p", "--package NAME", "Find package by name") { |v| @options[:package] = v }
+        opts.on("-l", "--license LICENSE", "Find packages with license") { |v| @options[:license] = v }
+        opts.on("--purl PURL", "Find package by PURL") { |v| @options[:purl] = v }
+        opts.on("-h", "--help", "Show help") { puts opts; exit }
+      end
+      parser.parse!(@args)
+
+      file = @args.shift
+      abort "Error: No file specified" unless file
+
+      sbom = Sbom::Parser.parse_file(file)
+
+      if @options[:package]
+        results = sbom.packages.select { |p| p[:name]&.include?(@options[:package]) }
+        puts "Packages matching '#{@options[:package]}':"
+        results.each do |pkg|
+          puts "  - #{pkg[:name]} @ #{pkg[:version]}"
+          puts "    License: #{pkg[:license_concluded] || pkg[:license_declared] || 'Unknown'}"
+        end
+      elsif @options[:license]
+        results = sbom.packages.select do |p|
+          (p[:license_concluded] || p[:license_declared])&.include?(@options[:license])
+        end
+        puts "Packages with license '#{@options[:license]}':"
+        results.each { |pkg| puts "  - #{pkg[:name]} @ #{pkg[:version]}" }
+      elsif @options[:purl]
+        results = sbom.packages.select { |p| p[:purl]&.include?(@options[:purl]) }
+        puts "Packages matching PURL '#{@options[:purl]}':"
+        results.each { |pkg| puts "  - #{pkg[:name]} @ #{pkg[:version]}" }
+      else
+        puts "Specify a query option. Use --help for options."
+      end
+    rescue Sbom::ParserError => e
+      abort "Error: #{e.message}"
+    end
+
+    def document_info_command
+      parser = OptionParser.new do |opts|
+        opts.banner = "Usage: sbom document info <file>"
+        opts.on("-h", "--help", "Show help") { puts opts; exit }
+      end
+      parser.parse!(@args)
+
+      file = @args.shift
+      abort "Error: No file specified" unless file
+
+      sbom = Sbom::Parser.parse_file(file)
+
+      puts "Document Information"
+      puts "===================="
+      puts ""
+      puts "Format: #{sbom.sbom_type.to_s.upcase}"
+      puts "Version: #{sbom.version}"
+
+      if sbom.document
+        doc = sbom.document
+        puts "Name: #{doc[:name]}" if doc[:name]
+        puts "ID: #{doc[:id]}" if doc[:id]
+        puts "Namespace: #{doc[:namespace]}" if doc[:namespace]
+        puts "Created: #{doc[:created]}" if doc[:created]
+        puts "Supplier: #{doc[:metadata_supplier]}" if doc[:metadata_supplier]
+      end
+
+      puts ""
+      puts "Statistics:"
+      puts "  Packages: #{sbom.packages.count}"
+      puts "  Files: #{sbom.files.count}"
+      puts "  Relationships: #{sbom.relationships.count}"
+
+      licenses = sbom.packages.map { |p| p[:license_concluded] || p[:license_declared] }.compact.uniq
+      if licenses.any?
+        puts ""
+        puts "Licenses found:"
+        licenses.each { |lic| puts "  - #{lic}" }
+      end
+    rescue Sbom::ParserError => e
+      abort "Error: #{e.message}"
+    end
+
+    def print_summary(sbom)
+      puts "SBOM Summary"
+      puts "============"
+      puts "Type: #{sbom.sbom_type}"
+      puts "Packages: #{sbom.packages.count}"
+      puts "Files: #{sbom.files.count}"
+      puts "Relationships: #{sbom.relationships.count}"
+    end
+
+    def show_help
+      puts <<~HELP
+        sbom - Software Bill of Materials tool
+
+        Usage: sbom <command> [options]
+
+        Commands:
+          parse      Parse and display SBOM contents
+          generate   Create a new SBOM
+          validate   Validate SBOM against schema
+          convert    Convert between SBOM formats
+          document   Work with SBOM documents
+          version    Show version
+
+        Document subcommands:
+          outline    Show structure of an SBOM
+          query      Search for information in an SBOM
+          info       Show document metadata
+
+        Run 'sbom <command> --help' for more information on a command.
+      HELP
+    end
+  end
+end
+
+Sbom::CLI.new(ARGV).run
