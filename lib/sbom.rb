@@ -33,6 +33,7 @@ require_relative "sbom/validation_result"
 require_relative "sbom/validator"
 require_relative "sbom/output"
 require_relative "sbom/enricher"
+require_relative "sbom/merger"
 
 module Sbom
   class << self
@@ -59,6 +60,14 @@ module Sbom
     def enrich_file(filename, sbom_type: :auto)
       sbom = parse_file(filename, sbom_type: sbom_type)
       Enricher.enrich(sbom)
+    end
+
+    def merge(sboms, dedupe: :purl)
+      Merger.merge(sboms, dedupe: dedupe)
+    end
+
+    def merge_files(filenames, dedupe: :purl)
+      Merger.merge_files(filenames, dedupe: dedupe)
     end
   end
 end

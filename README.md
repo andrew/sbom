@@ -85,6 +85,23 @@ enriched = Sbom.enrich_file("example.cdx.json")
 
 Enrichment adds: description, homepage, download location, license, repository URL, registry URL, documentation URL, supplier info, and security advisories.
 
+### Merging SBOMs
+
+Combine multiple SBOMs into one:
+
+```ruby
+# Merge from files (dedupes by PURL by default)
+merged = Sbom.merge_files(["app1.cdx.json", "app2.spdx.json"])
+
+# Merge SBOM objects
+merged = Sbom.merge([sbom1, sbom2, sbom3])
+
+# Keep all packages without deduplication
+merged = Sbom.merge([sbom1, sbom2], dedupe: :none)
+```
+
+Merging works across formats. Packages are deduplicated by PURL by default. Relationships and licenses are also deduplicated.
+
 ### Building Packages
 
 The Package class provides an object interface for building package data:
@@ -139,6 +156,11 @@ sbom document query example.cdx.json --license MIT
 sbom enrich example.cdx.json
 sbom enrich example.cdx.json --output enriched.json
 cat example.cdx.json | sbom enrich -
+
+# Merge multiple SBOMs
+sbom merge app1.cdx.json app2.spdx.json --output merged.json
+sbom merge app1.json app2.json --no-dedupe
+sbom merge app1.json app2.json --type cyclonedx
 ```
 
 ## Supported Formats

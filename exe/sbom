@@ -27,6 +27,8 @@ module Sbom
         convert_command
       when "enrich"
         enrich_command
+      when "merge"
+        merge_command
       when "document"
         document_command
       when "version", "-v", "--version"
@@ -205,6 +207,40 @@ module Sbom
       abort "Error: #{e.message}"
     end
 
+    def merge_command
+      parser = OptionParser.new do |opts|
+        opts.banner = "Usage: sbom merge <file1> <file2> [file3...] [options]"
+        opts.on("-t", "--type TYPE", "Output SBOM type (spdx, cyclonedx)") { |v| @options[:type] = v.to_sym }
+        opts.on("-f", "--format FORMAT", "Output format (json, yaml, tag)") { |v| @options[:format] = v.to_sym }
+        opts.on("-o", "--output FILE", "Output file") { |v| @options[:output] = v }
+        opts.on("--no-dedupe", "Keep all packages (don't dedupe by PURL)") { @options[:dedupe] = :none }
+        opts.on("-h", "--help", "Show help") { puts opts; exit }
+      end
+      parser.parse!(@args)
+
+      abort "Error: At least 2 files required" if @args.size < 2
+
+      dedupe = @options[:dedupe] || :purl
+      merged = Sbom::Merger.merge_files(@args, dedupe: dedupe)
+
+      output_type = @options[:type] || merged.sbom_type || :spdx
+      output_format = @options[:format] || :json
+
+      generator = Sbom::Generator.new(sbom_type: output_type, format: output_format)
+      generator.generate(merged.document&.dig(:name) || "Merged SBOM", merged.to_h)
+
+      output = generator.output
+
+      if @options[:output]
+        File.write(@options[:output], output)
+        puts "Merged SBOM written to #{@options[:output]}"
+      else
+        puts output
+      end
+    rescue Sbom::ParserError, Sbom::GeneratorError => e
+      abort "Error: #{e.message}"
+    end
+
     def document_command
       subcommand = @args.shift
 
@@ -377,6 +413,7 @@ module Sbom
           validate   Validate SBOM against schema
           convert    Convert between SBOM formats
           enrich     Enrich SBOM with data from ecosyste.ms
+          merge      Combine multiple SBOMs into one
           document   Work with SBOM documents
           version    Show version
 

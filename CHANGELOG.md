@@ -1,5 +1,13 @@
 ## [Unreleased]
 
+## [0.3.0] - 2025-12-23
+
+- Add `merge` command to CLI for combining multiple SBOMs into one
+- Add `Sbom.merge` and `Sbom.merge_files` library methods
+- Add `Sbom::Merger` class for merging SBOMs with configurable deduplication
+- Merge deduplicates packages by PURL by default, with option to keep all
+- Supports merging across formats (SPDX + CycloneDX)
+
 ## [0.2.0] - 2025-12-14
 
 - Add `enrich` command to CLI for enriching SBOMs with data from ecosyste.ms
