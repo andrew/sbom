@@ -24,6 +24,7 @@ module Sbom
         @output = {}
         @components = []
         @dependencies = []
+        @vulnerabilities = []
         @element_refs = {}
       end
 
@@ -41,6 +42,7 @@ module Sbom
         generate_document_header(project_name, component_data, uuid, bom_version)
         generate_components(data[:packages])
         generate_dependencies(data[:relationships])
+        generate_vulnerabilities(data[:vulnerabilities])
 
         finalize_output
       end
@@ -234,9 +236,54 @@ module Sbom
         end
       end
 
+      def generate_vulnerabilities(vulnerabilities_data)
+        return unless vulnerabilities_data&.any?
+
+        vulnerabilities_data.each do |vuln|
+          generate_vulnerability(vuln)
+        end
+      end
+
+      def generate_vulnerability(vuln)
+        return unless vuln[:id]
+
+        vulnerability = { "id" => vuln[:id] }
+
+        if vuln[:source]
+          source = {}
+          source["name"] = vuln[:source][:name] if vuln[:source][:name]
+          source["url"] = vuln[:source][:url] if vuln[:source][:url]
+          vulnerability["source"] = source if source.any?
+        end
+
+        if vuln[:ratings]&.any?
+          vulnerability["ratings"] = vuln[:ratings].map do |rating|
+            r = {}
+            r["severity"] = rating[:severity] if rating[:severity]
+            r["score"] = rating[:score] if rating[:score]
+            r["method"] = rating[:method] if rating[:method]
+            r
+          end.reject(&:empty?)
+        end
+
+        vulnerability["description"] = vuln[:description] if vuln[:description]
+
+        if vuln[:affects]&.any?
+          vulnerability["affects"] = vuln[:affects].map do |affect|
+            { "ref" => affect[:ref] }
+          end
+        end
+
+        vulnerability["published"] = vuln[:published] if vuln[:published]
+        vulnerability["updated"] = vuln[:updated] if vuln[:updated]
+
+        @vulnerabilities << vulnerability
+      end
+
       def finalize_output
         @output["components"] = @components if @components.any?
         @output["dependencies"] = @dependencies if @dependencies.any?
+        @output["vulnerabilities"] = @vulnerabilities if @vulnerabilities.any?
       end
 
       def version_at_least?(version)

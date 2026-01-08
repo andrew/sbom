@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Add CycloneDX vulnerabilities array support to generator
+
 ## [0.3.0] - 2025-12-23
 
 - Add `merge` command to CLI for combining multiple SBOMs into one

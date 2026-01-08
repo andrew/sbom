@@ -52,6 +52,24 @@ puts generator.output
 generator = Sbom::Generator.new(sbom_type: :cyclonedx)
 generator.generate("MyProject", sbom_data)
 File.write("sbom.cdx.json", generator.output)
+
+# Generate CycloneDX with vulnerabilities
+data = {
+  packages: packages_data,
+  vulnerabilities: [
+    {
+      id: "CVE-2024-1234",
+      source: { name: "OSV", url: "https://osv.dev" },
+      ratings: [{ severity: "high", score: 8.1, method: "CVSSv31" }],
+      description: "A critical vulnerability",
+      affects: [{ ref: "pkg:npm/lodash@4.17.20" }],
+      published: "2024-01-15T00:00:00Z",
+      updated: "2024-01-20T12:00:00Z"
+    }
+  ]
+}
+generator = Sbom::Generator.new(sbom_type: :cyclonedx)
+generator.generate("MyProject", data)
 ```
 
 ### Validating SBOMs
