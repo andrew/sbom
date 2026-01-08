@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.4.0] - 2026-01-08
+
 - Add CycloneDX vulnerabilities array support to generator
 
 ## [0.3.0] - 2025-12-23
