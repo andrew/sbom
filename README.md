@@ -131,6 +131,12 @@ package.version = "7.0.0"
 package.license_concluded = "MIT"
 package.add_checksum("SHA256", "abc123...")
 
+# Go modules use base64-encoded hashes in go.sum - convert to hex first:
+require "base64"
+go_hash = "h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4="
+hex = Base64.decode64(go_hash.sub(/^h1:/, "")).unpack1("H*")
+package.add_checksum("SHA256", hex)
+
 # Generate a PURL
 package.generate_purl(type: "gem")
 # => "pkg:gem/rails@7.0.0"
