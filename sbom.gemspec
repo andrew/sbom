@@ -26,6 +26,10 @@ Gem::Specification.new do |spec|
         f.start_with?(*%w[bin/ Gemfile .gitignore test/ .github/ spec/])
     end
   end
+
+  # Include schema files from submodules (git ls-files doesn't include submodule contents)
+  spec.files += Dir.glob("spec/cyclonedx/schema/bom-*.schema.json")
+  spec.files += Dir.glob("spec/spdx/schemas/spdx-schema.json")
   spec.bindir = "exe"
   spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
