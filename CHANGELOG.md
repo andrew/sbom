@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [0.4.1] - 2026-01-14
+
+- Include CycloneDX and SPDX schema files in published gem
+
 ## [0.4.0] - 2026-01-08
 
 - Add CycloneDX vulnerabilities array support to generator
