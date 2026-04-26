@@ -38,7 +38,7 @@ GEM
       date
       stringio
     public_suffix (7.0.5)
-    purl (1.8.0)
+    purl (1.8.1)
       addressable (~> 2.8)
     rake (13.3.1)
     rdoc (7.2.0)
@@ -79,7 +79,7 @@ CHECKSUMS
   prism (1.9.0) sha256=7b530c6a9f92c24300014919c9dcbc055bf4cdf51ec30aed099b06cd6674ef85
   psych (5.3.1) sha256=eb7a57cef10c9d70173ff74e739d843ac3b2c019a003de48447b2963d81b1974
   public_suffix (7.0.5) sha256=1a8bb08f1bbea19228d3bed6e5ed908d1cb4f7c2726d18bd9cadf60bc676f623
-  purl (1.8.0) sha256=4cbfb71621b638ec8e930e9e92fdb026bbfb44f552b1db41afa04ebaf62aa170
+  purl (1.8.1) sha256=2d95954e147a99c785de6fec1c122ceb836aafffe823522d75c705c104074ea5
   rake (13.3.1) sha256=8c9e89d09f66a26a01264e7e3480ec0607f0c497a861ef16063604b1b08eb19c
   rdoc (7.2.0) sha256=8650f76cd4009c3b54955eb5d7e3a075c60a57276766ebf36f9085e8c9f23192
   regexp_parser (2.11.3) sha256=ca13f381a173b7a93450e53459075c9b76a10433caadcb2f1180f2c741fc55a4
