@@ -188,6 +188,143 @@ class GeneratorTest < Minitest::Test
     assert_equal "pkg:npm/lodash@4.17.19", vuln["affects"][1]["ref"]
   end
 
+  def test_cyclonedx_vulnerability_analysis
+    vulnerabilities = [
+      {
+        id: "CVE-2024-1234",
+        analysis: {
+          state: "resolved",
+          justification: "code_not_reachable",
+          response: ["update"],
+          detail: "Patched by distro",
+          first_issued: "2024-01-15T00:00:00Z",
+          last_updated: "2024-01-20T12:00:00Z"
+        }
+      }
+    ]
+
+    generator = Sbom::Generator.new(sbom_type: :cyclonedx, format: :json)
+    generator.generate("Test Project", { packages: {}, vulnerabilities: vulnerabilities })
+
+    data = JSON.parse(generator.output)
+    analysis = data["vulnerabilities"].first["analysis"]
+
+    assert_equal "resolved", analysis["state"]
+    assert_equal "code_not_reachable", analysis["justification"]
+    assert_equal ["update"], analysis["response"]
+    assert_equal "Patched by distro", analysis["detail"]
+    assert_equal "2024-01-15T00:00:00Z", analysis["firstIssued"]
+    assert_equal "2024-01-20T12:00:00Z", analysis["lastUpdated"]
+  end
+
+  def test_cyclonedx_vulnerability_analysis_partial
+    vulnerabilities = [
+      { id: "CVE-2024-1234", analysis: { state: "in_triage" } }
+    ]
+
+    generator = Sbom::Generator.new(sbom_type: :cyclonedx, format: :json)
+    generator.generate("Test Project", { packages: {}, vulnerabilities: vulnerabilities })
+
+    data = JSON.parse(generator.output)
+
+    assert_equal({ "state" => "in_triage" }, data["vulnerabilities"].first["analysis"])
+  end
+
+  def test_cyclonedx_vulnerability_analysis_response_scalar_wrapped
+    vulnerabilities = [
+      { id: "CVE-2024-1234", analysis: { response: "will_not_fix" } }
+    ]
+
+    generator = Sbom::Generator.new(sbom_type: :cyclonedx, format: :json)
+    generator.generate("Test Project", { packages: {}, vulnerabilities: vulnerabilities })
+
+    data = JSON.parse(generator.output)
+
+    assert_equal ["will_not_fix"], data["vulnerabilities"].first["analysis"]["response"]
+  end
+
+  def test_cyclonedx_vulnerability_analysis_empty_omitted
+    vulnerabilities = [
+      { id: "CVE-2024-1234", analysis: {} }
+    ]
+
+    generator = Sbom::Generator.new(sbom_type: :cyclonedx, format: :json)
+    generator.generate("Test Project", { packages: {}, vulnerabilities: vulnerabilities })
+
+    data = JSON.parse(generator.output)
+
+    refute data["vulnerabilities"].first.key?("analysis")
+  end
+
+  def test_cyclonedx_component_pedigree_patches
+    packages = [
+      {
+        name: "libquicktime",
+        version: "1.2.4",
+        purl: "pkg:brew/libquicktime@1.2.4",
+        pedigree: {
+          patches: [
+            {
+              type: "backport",
+              diff: { url: "https://deb.debian.org/.../libquicktime_1.2.4-12.debian.tar.xz" },
+              resolves: [
+                { type: "security", id: "CVE-2016-2399", source: { name: "NVD" } },
+                { type: "security", id: "CVE-2017-9122", references: ["https://nvd.nist.gov/vuln/detail/CVE-2017-9122"] }
+              ]
+            },
+            {
+              type: "unofficial",
+              resolves: [
+                { type: "defect", id: "https://github.com/foo/bar/issues/1", name: "build fix" }
+              ]
+            }
+          ],
+          notes: "Debian-maintained patch set"
+        }
+      }
+    ]
+
+    generator = Sbom::Generator.new(sbom_type: :cyclonedx, format: :json)
+    generator.generate("Test Project", { packages: packages })
+
+    data = JSON.parse(generator.output)
+    pedigree = data["components"].first["pedigree"]
+
+    assert_equal "Debian-maintained patch set", pedigree["notes"]
+    assert_equal 2, pedigree["patches"].count
+
+    p1 = pedigree["patches"][0]
+    assert_equal "backport", p1["type"]
+    assert_equal "https://deb.debian.org/.../libquicktime_1.2.4-12.debian.tar.xz", p1["diff"]["url"]
+    refute p1["diff"].key?("text")
+    assert_equal 2, p1["resolves"].count
+    assert_equal "security", p1["resolves"][0]["type"]
+    assert_equal "CVE-2016-2399", p1["resolves"][0]["id"]
+    assert_equal "NVD", p1["resolves"][0]["source"]["name"]
+    assert_equal ["https://nvd.nist.gov/vuln/detail/CVE-2017-9122"], p1["resolves"][1]["references"]
+
+    p2 = pedigree["patches"][1]
+    assert_equal "unofficial", p2["type"]
+    refute p2.key?("diff")
+    assert_equal "defect", p2["resolves"][0]["type"]
+    assert_equal "build fix", p2["resolves"][0]["name"]
+  end
+
+  def test_cyclonedx_component_pedigree_omitted_when_empty
+    packages = [
+      { name: "x", version: "1", pedigree: {} },
+      { name: "y", version: "1" }
+    ]
+
+    generator = Sbom::Generator.new(sbom_type: :cyclonedx, format: :json)
+    generator.generate("Test Project", { packages: packages })
+
+    data = JSON.parse(generator.output)
+
+    refute data["components"][0].key?("pedigree")
+    refute data["components"][1].key?("pedigree")
+  end
+
   def test_cyclonedx_vulnerabilities_skips_without_id
     vulnerabilities = [
       { description: "Missing ID vulnerability" },
