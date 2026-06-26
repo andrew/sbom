@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-26
+
 - CycloneDX generator: support `analysis` on vulnerabilities (`state`, `justification`, `response`, `detail`, `firstIssued`, `lastUpdated`)
 - CycloneDX generator: support `pedigree` on components (`patches` with `type`/`diff`/`resolves`, and `notes`)
 
