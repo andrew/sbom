@@ -219,7 +219,8 @@ module Sbom
         result = {}
 
         if pedigree[:patches]&.any?
-          result["patches"] = pedigree[:patches].map { |p| generate_pedigree_patch(p) }
+          patches = pedigree[:patches].map { |p| generate_pedigree_patch(p) }.compact
+          result["patches"] = patches if patches.any?
         end
         result["notes"] = pedigree[:notes] if pedigree[:notes]
 
@@ -227,8 +228,11 @@ module Sbom
       end
 
       def generate_pedigree_patch(patch)
-        result = {}
-        result["type"] = patch[:type].to_s if patch[:type]
+        # CycloneDX requires `type` on patch objects; drop entries without one
+        # rather than emit `{}` or an empty-string type that fails validation.
+        return nil unless patch && patch[:type]
+
+        result = { "type" => patch[:type].to_s }
 
         if patch[:diff]
           diff = {}
@@ -238,13 +242,17 @@ module Sbom
         end
 
         if patch[:resolves]&.any?
-          result["resolves"] = patch[:resolves].map { |i| generate_issue(i) }
+          resolves = patch[:resolves].map { |i| generate_issue(i) }.compact
+          result["resolves"] = resolves if resolves.any?
         end
 
         result
       end
 
       def generate_issue(issue)
+        # `type` is required on CycloneDX issue objects.
+        return nil unless issue && issue[:type]
+
         result = { "type" => issue[:type].to_s }
         result["id"] = issue[:id] if issue[:id]
         result["name"] = issue[:name] if issue[:name]

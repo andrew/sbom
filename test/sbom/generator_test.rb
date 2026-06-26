@@ -325,6 +325,47 @@ class GeneratorTest < Minitest::Test
     refute data["components"][1].key?("pedigree")
   end
 
+  def test_cyclonedx_component_pedigree_drops_invalid_patches_and_issues
+    packages = [
+      {
+        name: "x",
+        version: "1",
+        pedigree: {
+          patches: [
+            {}, # no type, dropped
+            {
+              type: :backport,
+              resolves: [
+                { id: "CVE-1" }, # no type, dropped
+                { type: :security, id: "CVE-2" }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        name: "y",
+        version: "1",
+        pedigree: { patches: [{ resolves: [{ id: "CVE-3" }] }] } # all dropped -> pedigree omitted
+      }
+    ]
+
+    generator = Sbom::Generator.new(sbom_type: :cyclonedx, format: :json)
+    generator.generate("Test Project", { packages: packages })
+
+    data = JSON.parse(generator.output)
+
+    pedigree = data["components"][0]["pedigree"]
+
+    assert_equal 1, pedigree["patches"].count
+    patch = pedigree["patches"].first
+
+    assert_equal "backport", patch["type"]
+    assert_equal [{ "type" => "security", "id" => "CVE-2" }], patch["resolves"]
+
+    refute data["components"][1].key?("pedigree")
+  end
+
   def test_cyclonedx_vulnerabilities_skips_without_id
     vulnerabilities = [
       { description: "Missing ID vulnerability" },
