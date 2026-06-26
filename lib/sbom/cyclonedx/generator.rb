@@ -207,7 +207,66 @@ module Sbom
           end
         end
 
+        pedigree = generate_pedigree(pkg[:pedigree])
+        component["pedigree"] = pedigree if pedigree
+
         @components << component
+      end
+
+      def generate_pedigree(pedigree)
+        return nil unless pedigree
+
+        result = {}
+
+        if pedigree[:patches]&.any?
+          patches = pedigree[:patches].map { |p| generate_pedigree_patch(p) }.compact
+          result["patches"] = patches if patches.any?
+        end
+        result["notes"] = pedigree[:notes] if pedigree[:notes]
+
+        result.empty? ? nil : result
+      end
+
+      def generate_pedigree_patch(patch)
+        # CycloneDX requires `type` on patch objects; drop entries without one
+        # rather than emit `{}` or an empty-string type that fails validation.
+        return nil unless patch && patch[:type]
+
+        result = { "type" => patch[:type].to_s }
+
+        if patch[:diff]
+          diff = {}
+          diff["text"] = patch[:diff][:text] if patch[:diff][:text]
+          diff["url"] = patch[:diff][:url] if patch[:diff][:url]
+          result["diff"] = diff if diff.any?
+        end
+
+        if patch[:resolves]&.any?
+          resolves = patch[:resolves].map { |i| generate_issue(i) }.compact
+          result["resolves"] = resolves if resolves.any?
+        end
+
+        result
+      end
+
+      def generate_issue(issue)
+        # `type` is required on CycloneDX issue objects.
+        return nil unless issue && issue[:type]
+
+        result = { "type" => issue[:type].to_s }
+        result["id"] = issue[:id] if issue[:id]
+        result["name"] = issue[:name] if issue[:name]
+        result["description"] = issue[:description] if issue[:description]
+
+        if issue[:source]
+          source = {}
+          source["name"] = issue[:source][:name] if issue[:source][:name]
+          source["url"] = issue[:source][:url] if issue[:source][:url]
+          result["source"] = source if source.any?
+        end
+
+        result["references"] = Array(issue[:references]) if issue[:references]
+        result
       end
 
       def generate_dependencies(relationships_data)
@@ -274,10 +333,27 @@ module Sbom
           end
         end
 
+        analysis = generate_analysis(vuln[:analysis])
+        vulnerability["analysis"] = analysis if analysis
+
         vulnerability["published"] = vuln[:published] if vuln[:published]
         vulnerability["updated"] = vuln[:updated] if vuln[:updated]
 
         @vulnerabilities << vulnerability
+      end
+
+      def generate_analysis(analysis)
+        return nil unless analysis
+
+        result = {}
+        result["state"] = analysis[:state] if analysis[:state]
+        result["justification"] = analysis[:justification] if analysis[:justification]
+        result["response"] = Array(analysis[:response]) if analysis[:response]
+        result["detail"] = analysis[:detail] if analysis[:detail]
+        result["firstIssued"] = analysis[:first_issued] if analysis[:first_issued]
+        result["lastUpdated"] = analysis[:last_updated] if analysis[:last_updated]
+
+        result.empty? ? nil : result
       end
 
       def finalize_output

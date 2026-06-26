@@ -1,5 +1,8 @@
 ## [Unreleased]
 
+- CycloneDX generator: support `analysis` on vulnerabilities (`state`, `justification`, `response`, `detail`, `firstIssued`, `lastUpdated`)
+- CycloneDX generator: support `pedigree` on components (`patches` with `type`/`diff`/`resolves`, and `notes`)
+
 ## [0.4.1] - 2026-01-14
 
 - Include CycloneDX and SPDX schema files in published gem

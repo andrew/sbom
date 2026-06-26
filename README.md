@@ -63,6 +63,7 @@ data = {
       ratings: [{ severity: "high", score: 8.1, method: "CVSSv31" }],
       description: "A critical vulnerability",
       affects: [{ ref: "pkg:npm/lodash@4.17.20" }],
+      analysis: { state: "resolved", detail: "Patched by distro" },
       published: "2024-01-15T00:00:00Z",
       updated: "2024-01-20T12:00:00Z"
     }
