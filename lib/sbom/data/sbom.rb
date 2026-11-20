@@ -5,8 +5,9 @@ module Sbom
     class Sbom
       attr_accessor :sbom_type, :version, :uuid, :bom_version
 
-      def initialize(sbom_type: :auto)
+      def initialize(sbom_type: :auto, preserve_instances: false)
         @sbom_type = sbom_type
+        @preserve_instances = preserve_instances
         @document = nil
         @files = {}
         @packages = {}
@@ -48,7 +49,7 @@ module Sbom
 
       def add_package(package)
         data = package.is_a?(Hash) ? package : package.to_h
-        key = [data[:name], data[:version]]
+        key = Package.identity_key(data, preserve_instances: @preserve_instances)
         @packages[key] = data if data[:name]
       end
 

@@ -37,12 +37,12 @@ require_relative "sbom/merger"
 
 module Sbom
   class << self
-    def parse_file(filename, sbom_type: :auto)
-      Parser.parse_file(filename, sbom_type: sbom_type)
+    def parse_file(filename, sbom_type: :auto, preserve_instances: false)
+      Parser.parse_file(filename, sbom_type: sbom_type, preserve_instances: preserve_instances)
     end
 
-    def parse_string(content, sbom_type: :auto)
-      Parser.parse_string(content, sbom_type: sbom_type)
+    def parse_string(content, sbom_type: :auto, preserve_instances: false)
+      Parser.parse_string(content, sbom_type: sbom_type, preserve_instances: preserve_instances)
     end
 
     def generate(project_name, sbom_data, sbom_type: :spdx, format: :json)

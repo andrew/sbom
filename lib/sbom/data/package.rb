@@ -361,6 +361,14 @@ module Sbom
         @data[key.to_sym] = value
       end
 
+      def self.identity_key(data, preserve_instances:)
+        return [data[:name], data[:version]] unless preserve_instances
+
+        purls = Array(data[:external_references]).filter_map { |_, type, value| value if type == "purl" }
+        purls << data[:purl] if data[:purl]
+        [data[:name], data[:version], data[:id], data[:bom_ref], purls.uniq.sort]
+      end
+
       def to_h
         @data.dup
       end

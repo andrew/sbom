@@ -13,7 +13,8 @@ module Sbom
       FORMAT_XML = :xml
       FORMAT_RDF = :rdf
 
-      def initialize
+      def initialize(preserve_instances: false)
+        @preserve_instances = preserve_instances
         @document = Data::Document.new
         @packages = {}
         @files = {}
@@ -167,7 +168,7 @@ module Sbom
         end
 
         @elements[package.id] = package.name
-        @packages[[package.name, package.version]] = package.to_h
+        @packages[Data::Package.identity_key(package.to_h, preserve_instances: @preserve_instances)] = package.to_h
       end
 
       def parse_json_file(data)
@@ -345,7 +346,7 @@ module Sbom
         return unless package&.name
 
         @elements[package.id] = package.name if package.id
-        @packages[[package.name, package.version]] = package.to_h
+        @packages[Data::Package.identity_key(package.to_h, preserve_instances: @preserve_instances)] = package.to_h
       end
 
       def save_file(file)
@@ -382,7 +383,7 @@ module Sbom
         package.id = pkg.elements["SPDXID"]&.text
 
         @elements[package.id] = package.name if package.id
-        @packages[[package.name, package.version]] = package.to_h
+        @packages[Data::Package.identity_key(package.to_h, preserve_instances: @preserve_instances)] = package.to_h
       end
 
       def parse_rdf(content)
@@ -400,7 +401,7 @@ module Sbom
               package = Data::Package.new
               package.name = current_name
               package.version = current_version
-              @packages[[current_name, current_version]] = package.to_h
+              @packages[Data::Package.identity_key(package.to_h, preserve_instances: @preserve_instances)] = package.to_h
               current_name = nil
               current_version = nil
             end
@@ -412,7 +413,7 @@ module Sbom
       end
 
       def build_sbom
-        sbom = Data::Sbom.new(sbom_type: :spdx)
+        sbom = Data::Sbom.new(sbom_type: :spdx, preserve_instances: @preserve_instances)
         sbom.version = @document.version
         sbom.add_document(@document.to_h)
         sbom.add_packages(@packages)

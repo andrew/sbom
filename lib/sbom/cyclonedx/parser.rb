@@ -9,7 +9,8 @@ module Sbom
       FORMAT_JSON = :json
       FORMAT_XML = :xml
 
-      def initialize
+      def initialize(preserve_instances: false)
+        @preserve_instances = preserve_instances
         @document = Data::Document.new
         @packages = {}
         @files = {}
@@ -84,6 +85,7 @@ module Sbom
           @document.name = metadata["component"]["name"]
           @document.metadata_type = metadata["component"]["type"]
           @document.metadata_version = metadata["component"]["version"]
+          @document[:component_id] = metadata["component"]["bom-ref"] if @preserve_instances
         end
 
         if metadata["supplier"]
@@ -150,13 +152,13 @@ module Sbom
           package.add_property(prop["name"], prop["value"])
         end
 
-        @packages[[package.name, package.version]] = package.to_h
+        @packages[Data::Package.identity_key(package.to_h, preserve_instances: @preserve_instances)] = package.to_h
 
         if parent_ref
           rel = Data::Relationship.new
           rel.source = parent_ref
           rel.target = package.id || package.name
-          rel.relationship_type = "DEPENDS_ON"
+          rel.relationship_type = @preserve_instances ? "CONTAINS" : "DEPENDS_ON"
           @relationships << rel.to_h
         end
 
@@ -187,6 +189,7 @@ module Sbom
           @document.name = component.elements["name"]&.text
           @document.metadata_type = component.attributes["type"]
           @document.metadata_version = component.elements["version"]&.text
+          @document[:component_id] = component.attributes["bom-ref"] if @preserve_instances
         end
 
         supplier = metadata.elements["supplier"]
@@ -234,7 +237,7 @@ module Sbom
           package.add_external_reference(ref_type, ref_type, url) if url
         end
 
-        @packages[[package.name, package.version]] = package.to_h
+        @packages[Data::Package.identity_key(package.to_h, preserve_instances: @preserve_instances)] = package.to_h
 
         nested = comp.elements["components"]
         parse_xml_components(nested) if nested
@@ -261,7 +264,7 @@ module Sbom
       end
 
       def build_sbom
-        sbom = Data::Sbom.new(sbom_type: :cyclonedx)
+        sbom = Data::Sbom.new(sbom_type: :cyclonedx, preserve_instances: @preserve_instances)
         sbom.version = @document.version
         sbom.add_document(@document.to_h)
         sbom.add_packages(@packages)

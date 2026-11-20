@@ -40,6 +40,14 @@ sbom.relationships.each do |rel|
 end
 ```
 
+For inspection of individual installed components, opt in when parsing:
+
+```ruby
+sbom = Sbom.parse_file("app.cdx.json", preserve_instances: true)
+```
+
+`Sbom.parse_string` and `Sbom::Parser.new` accept the same option. It retains distinct component IDs and PURLs, exposes the declared CycloneDX root as `document[:component_id]`, and classifies nested CycloneDX JSON assemblies as `CONTAINS`. Default calls retain their existing package keys, replacement behavior and relationship types. Nested XML containment is not represented. This option is for inspection only: CLI commands, generation and merging are unchanged and can discard instances or alter dependency edges.
+
 ### Generating SBOMs
 
 ```ruby
