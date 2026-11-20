@@ -15,8 +15,9 @@ module Sbom
       ".bom.xml" => [:cyclonedx, :xml]
     }.freeze
 
-    def initialize(sbom_type: :auto)
+    def initialize(sbom_type: :auto, preserve_instances: false)
       @sbom_type = sbom_type
+      @preserve_instances = preserve_instances
     end
 
     def parse_file(filename)
@@ -38,22 +39,22 @@ module Sbom
 
       case sbom_type
       when :spdx
-        parser = Spdx::Parser.new
+        parser = Spdx::Parser.new(preserve_instances: @preserve_instances)
         parser.parse(content, format)
       when :cyclonedx
-        parser = Cyclonedx::Parser.new
+        parser = Cyclonedx::Parser.new(preserve_instances: @preserve_instances)
         parser.parse(content, format)
       else
         try_both_parsers(content)
       end
     end
 
-    def self.parse_file(filename, sbom_type: :auto)
-      new(sbom_type: sbom_type).parse_file(filename)
+    def self.parse_file(filename, sbom_type: :auto, preserve_instances: false)
+      new(sbom_type: sbom_type, preserve_instances: preserve_instances).parse_file(filename)
     end
 
-    def self.parse_string(content, sbom_type: :auto)
-      new(sbom_type: sbom_type).parse_string(content)
+    def self.parse_string(content, sbom_type: :auto, preserve_instances: false)
+      new(sbom_type: sbom_type, preserve_instances: preserve_instances).parse_string(content)
     end
 
     private
@@ -91,7 +92,7 @@ module Sbom
 
     def try_both_parsers(content)
       begin
-        spdx_parser = Spdx::Parser.new
+        spdx_parser = Spdx::Parser.new(preserve_instances: @preserve_instances)
         result = spdx_parser.parse(content)
         return result if result.packages.any? || result.files.any?
       rescue StandardError
@@ -99,7 +100,7 @@ module Sbom
       end
 
       begin
-        cdx_parser = Cyclonedx::Parser.new
+        cdx_parser = Cyclonedx::Parser.new(preserve_instances: @preserve_instances)
         return cdx_parser.parse(content)
       rescue StandardError
         nil
