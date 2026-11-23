@@ -1,6 +1,7 @@
 ## [Unreleased]
 
 - Reject YAML nested more than 100 levels deep with a `ParserError` instead of spending minutes in the YAML parser
+- Parse CycloneDX and SPDX XML several times faster by reading child elements directly instead of through XPath
 
 ## [0.5.0] - 2026-06-26
 

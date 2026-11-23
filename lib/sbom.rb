@@ -8,6 +8,7 @@ require "purl"
 require_relative "sbom/version"
 require_relative "sbom/error"
 require_relative "sbom/yaml_loader"
+require_relative "sbom/xml_lookup"
 
 # Data models
 require_relative "sbom/data/document"

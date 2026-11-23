@@ -6,6 +6,8 @@ require "rexml/document"
 module Sbom
   module Cyclonedx
     class Parser
+      include XmlLookup
+
       FORMAT_JSON = :json
       FORMAT_XML = :xml
 
@@ -71,9 +73,12 @@ module Sbom
         @document.sbom_type = "cyclonedx"
         @document.id = root.attributes["serialNumber"]
 
-        parse_xml_metadata(root.elements["metadata"]) if root.elements["metadata"]
-        parse_xml_components(root.elements["components"]) if root.elements["components"]
-        parse_xml_dependencies(root.elements["dependencies"]) if root.elements["dependencies"]
+        metadata = xml_child(root, "metadata")
+        components = xml_child(root, "components")
+        dependencies = xml_child(root, "dependencies")
+        parse_xml_metadata(metadata) if metadata
+        parse_xml_components(components) if components
+        parse_xml_dependencies(dependencies) if dependencies
       rescue REXML::ParseException => e
         raise ParserError, "Invalid XML: #{e.message}"
       end
@@ -181,72 +186,72 @@ module Sbom
       end
 
       def parse_xml_metadata(metadata)
-        timestamp = metadata.elements["timestamp"]
+        timestamp = xml_child(metadata, "timestamp")
         @document.created = timestamp.text if timestamp
 
-        component = metadata.elements["component"]
+        component = xml_child(metadata, "component")
         if component
-          @document.name = component.elements["name"]&.text
+          @document.name = xml_child(component, "name")&.text
           @document.metadata_type = component.attributes["type"]
-          @document.metadata_version = component.elements["version"]&.text
+          @document.metadata_version = xml_child(component, "version")&.text
           @document[:component_id] = component.attributes["bom-ref"] if @preserve_instances
         end
 
-        supplier = metadata.elements["supplier"]
-        @document.metadata_supplier = supplier.elements["name"]&.text if supplier
+        supplier = xml_child(metadata, "supplier")
+        @document.metadata_supplier = xml_child(supplier, "name")&.text if supplier
       end
 
       def parse_xml_components(components)
-        components.elements.each("component") do |comp|
+        xml_children(components, "component").each do |comp|
           parse_xml_component(comp)
         end
       end
 
       def parse_xml_component(comp)
         package = Data::Package.new
-        package.name = comp.elements["name"]&.text
-        package.version = comp.elements["version"]&.text
+        package.name = xml_child(comp, "name")&.text
+        package.version = xml_child(comp, "version")&.text
         package.id = comp.attributes["bom-ref"]
         package.package_type = comp.attributes["type"]
-        package.description = comp.elements["description"]&.text
+        package.description = xml_child(comp, "description")&.text
 
-        supplier = comp.elements["supplier"]
+        supplier = xml_child(comp, "supplier")
         if supplier
-          package.set_supplier("Organization", supplier.elements["name"]&.text)
+          package.set_supplier("Organization", xml_child(supplier, "name")&.text)
         end
 
-        comp.elements.each("hashes/hash") do |hash|
+        xml_children(comp, "hashes", "hash").each do |hash|
           algo = hash.attributes["alg"]&.gsub("-", "")
           package.add_checksum(algo, hash.text) if algo
         end
 
-        comp.elements.each("licenses/license") do |lic|
-          license_id = lic.elements["id"]&.text || lic.elements["name"]&.text
+        xml_children(comp, "licenses", "license").each do |lic|
+          license_id = xml_child(lic, "id")&.text || xml_child(lic, "name")&.text
           if license_id
             package.license_concluded = license_id
             package.set_license_declared(license_id)
           end
         end
 
-        purl = comp.elements["purl"]
+        purl = xml_child(comp, "purl")
         package.purl = purl.text if purl
 
-        comp.elements.each("externalReferences/reference") do |ref|
+        xml_children(comp, "externalReferences", "reference").each do |ref|
           ref_type = ref.attributes["type"]
-          url = ref.elements["url"]&.text
+          url = xml_child(ref, "url")&.text
           package.add_external_reference(ref_type, ref_type, url) if url
         end
 
         @packages[Data::Package.identity_key(package.to_h, preserve_instances: @preserve_instances)] = package.to_h
 
-        nested = comp.elements["components"]
+        nested = xml_child(comp, "components")
         parse_xml_components(nested) if nested
       end
 
       def parse_xml_dependencies(dependencies)
-        dependencies.elements.each("dependency") do |dep|
+        xml_children(dependencies, "dependency").each do |dep|
           ref = dep.attributes["ref"]
-          dep.elements.each("dependency") do |child|
+          xml_children(dep, "dependency").each do |child|
             rel = Data::Relationship.new
             rel.source = ref
             rel.target = child.attributes["ref"]
