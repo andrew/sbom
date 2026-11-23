@@ -154,10 +154,10 @@ module Sbom
 
     def validate_spdx_yaml(content)
       begin
-        data = YAML.safe_load(content)
+        data = YamlLoader.safe_load(content)
         version = data["spdxVersion"]&.gsub("SPDX-", "")
         ValidationResult.new(valid: true, format: :spdx, version: version)
-      rescue Psych::SyntaxError => e
+      rescue Psych::SyntaxError, ParserError => e
         ValidationResult.new(valid: false, format: :spdx, errors: ["YAML parse error: #{e.message}"])
       end
     end

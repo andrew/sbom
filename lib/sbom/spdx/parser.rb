@@ -7,6 +7,8 @@ require "rexml/document"
 module Sbom
   module Spdx
     class Parser
+      include XmlLookup
+
       FORMAT_TAG = :tag
       FORMAT_JSON = :json
       FORMAT_YAML = :yaml
@@ -54,8 +56,10 @@ module Sbom
         return FORMAT_TAG if stripped.include?("PackageName:")
 
         begin
-          YAML.safe_load(stripped)
+          YamlLoader.safe_load(stripped)
           return FORMAT_YAML if stripped.include?("SPDXID:")
+        rescue ParserError
+          raise
         rescue StandardError
           nil
         end
@@ -73,7 +77,7 @@ module Sbom
       end
 
       def parse_yaml(content)
-        data = YAML.safe_load(content)
+        data = YamlLoader.safe_load(content)
         parse_spdx_data(data)
       rescue Psych::SyntaxError => e
         raise ParserError, "Invalid YAML: #{e.message}"
@@ -363,13 +367,13 @@ module Sbom
 
         namespace = root.namespace
 
-        @document.version = root.elements["spdxVersion"]&.text
-        @document.id = root.elements["SPDXID"]&.text
-        @document.name = root.elements["name"]&.text
-        @document.data_license = root.elements["dataLicense"]&.text
+        @document.version = xml_child(root, "spdxVersion")&.text
+        @document.id = xml_child(root, "SPDXID")&.text
+        @document.name = xml_child(root, "name")&.text
+        @document.data_license = xml_child(root, "dataLicense")&.text
         @document.sbom_type = "spdx"
 
-        root.elements.each("packages") do |pkg|
+        xml_children(root, "packages").each do |pkg|
           parse_xml_package(pkg, namespace)
         end
       rescue REXML::ParseException => e
@@ -378,9 +382,9 @@ module Sbom
 
       def parse_xml_package(pkg, _namespace)
         package = Data::Package.new
-        package.name = pkg.elements["name"]&.text
-        package.version = pkg.elements["versionInfo"]&.text
-        package.id = pkg.elements["SPDXID"]&.text
+        package.name = xml_child(pkg, "name")&.text
+        package.version = xml_child(pkg, "versionInfo")&.text
+        package.id = xml_child(pkg, "SPDXID")&.text
 
         @elements[package.id] = package.name if package.id
         @packages[Data::Package.identity_key(package.to_h, preserve_instances: @preserve_instances)] = package.to_h
