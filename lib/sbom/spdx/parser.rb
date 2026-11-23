@@ -54,8 +54,10 @@ module Sbom
         return FORMAT_TAG if stripped.include?("PackageName:")
 
         begin
-          YAML.safe_load(stripped)
+          YamlLoader.safe_load(stripped)
           return FORMAT_YAML if stripped.include?("SPDXID:")
+        rescue ParserError
+          raise
         rescue StandardError
           nil
         end
@@ -73,7 +75,7 @@ module Sbom
       end
 
       def parse_yaml(content)
-        data = YAML.safe_load(content)
+        data = YamlLoader.safe_load(content)
         parse_spdx_data(data)
       rescue Psych::SyntaxError => e
         raise ParserError, "Invalid YAML: #{e.message}"

@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Reject YAML nested more than 100 levels deep with a `ParserError` instead of spending minutes in the YAML parser
+
 ## [0.5.0] - 2026-06-26
 
 - CycloneDX generator: support `analysis` on vulnerabilities (`state`, `justification`, `response`, `detail`, `firstIssued`, `lastUpdated`)
